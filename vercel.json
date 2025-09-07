@@ -1,8 +1,15 @@
 {
+<<<<<<< HEAD
   "buildCommand": "cd apps/web && pnpm build",
   "devCommand": "cd apps/web && pnpm dev", 
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs",
+=======
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",  
+>>>>>>> 391f57e23cd082779b0f97eabd2986a8adc16a4e
   "env": {
     "NODE_ENV": "production"
   }
