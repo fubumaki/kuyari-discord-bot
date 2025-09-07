@@ -4,8 +4,20 @@ import { db } from '@kuyari/db';
 
 // Redis clients for caching and pub/sub. In production, consider reusing clients across
 // modules to avoid creating too many connections.
-const redis = new Redis(process.env.REDIS_URL as string);
-const subClient = new Redis(process.env.REDIS_URL as string);
+const redis = new Redis(process.env.REDIS_URL as string, {
+  lazyConnect: true,
+  enableReadyCheck: false,
+  retryStrategy: () => null,
+  maxRetriesPerRequest: null,
+});
+const subClient = new Redis(process.env.REDIS_URL as string, {
+  lazyConnect: true,
+  enableReadyCheck: false,
+  retryStrategy: () => null,
+  maxRetriesPerRequest: null,
+});
+redis.on('error', (err) => console.error('Redis(entitlements) error:', err?.message || err));
+subClient.on('error', (err) => console.error('Redis(sub) error:', err?.message || err));
 
 // TTL for cache entries in seconds
 const ENTITLEMENT_CACHE_TTL = 60;

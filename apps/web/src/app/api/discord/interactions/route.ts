@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         ],
       } as const;
       // No await – do not delay the response
-      fetch(`${upstashUrl}/pipeline`, {
+      fetch(`${upstashUrl.replace(/\s/g, '')}/pipeline`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${upstashToken}`,
