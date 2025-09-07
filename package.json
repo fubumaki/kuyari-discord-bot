@@ -16,12 +16,14 @@
     "register-commands": "tsx scripts/register-commands.ts",
     "worker": "tsx scripts/worker.ts"
   },
+  "dependencies": {
+    "next": "14.2.5"
+  },
   "devDependencies": {
     "eslint": "^9.0.0",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",
     "prettier": "^3.2.0",
-    "next": "14.2.5",
     "tsx": "^4.20.4",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
