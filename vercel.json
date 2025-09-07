@@ -1,11 +1,10 @@
 {
-  "buildCommand": "cd apps/web && pnpm build",
-  "devCommand": "cd apps/web && pnpm dev",
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
   "installCommand": "pnpm install",
   "framework": "nextjs",
-  "rootDirectory": "apps/web",
   "functions": {
-    "src/app/api/**/*.ts": {
+    "apps/web/src/app/api/**/*.ts": {
       "maxDuration": 30
     }
   },
