@@ -15,7 +15,7 @@
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^20.19.10",
+    "@types/node": "^22.0.0",
     "@types/pg": "^8.15.5",
     "typescript": "^5.4.0"
   },
