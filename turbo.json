@@ -1,7 +1,24 @@
 {
   "tasks": {
     "dev": { "cache": false, "persistent": true },
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"], "env": [
+      "DISCORD_BOT_TOKEN",
+      "DISCORD_CLIENT_ID",
+      "DISCORD_CLIENT_SECRET",
+      "DISCORD_PUBLIC_KEY",
+      "DATABASE_URL",
+      "REDIS_URL",
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "NEXTAUTH_URL",
+      "NEXTAUTH_SECRET",
+      "BASE_URL",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_PUBLISHABLE_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "PRICE_PREMIUM",
+      "PRICE_PRO"
+    ] },
     "lint": {},
     "typecheck": {},
     "test": {}

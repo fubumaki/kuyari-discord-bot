@@ -11,7 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "pnpm exec tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "devDependencies": {
