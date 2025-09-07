@@ -1,46 +1,77 @@
-// Minimal, fast-ACK Discord interactions handler (Edge runtime)
+import type { NextRequest } from 'next/server';
+import { InteractionResponseType, InteractionType, verifyKey } from 'discord-interactions';
+
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+export const preferredRegion = ['iad1'];
 
-import { InteractionType, InteractionResponseType, verifyKey } from 'discord-interactions';
+const PK = process.env.DISCORD_PUBLIC_KEY;
+const DEBUG = process.env.DISCORD_DEBUG === '1';
 
-const EPHEMERAL = 1 << 6; // 64
-
-function badSig(): Response {
-  return new Response('Bad request signature', { status: 401 });
+function log(level: 'log' | 'warn' | 'error', msg: string, meta: Record<string, unknown> = {}) {
+  const line = JSON.stringify({ svc: 'discord-interactions', msg, ...meta });
+  console[level](line);
 }
 
-export async function POST(req: Request) {
-  const signature = req.headers.get('x-signature-ed25519');
-  const timestamp = req.headers.get('x-signature-timestamp');
-  const publicKey = process.env.DISCORD_PUBLIC_KEY;
+export async function POST(req: NextRequest) {
+  const reqId = crypto.randomUUID();
+  const vercelId = req.headers.get('x-vercel-id') ?? 'n/a';
+  const ts = req.headers.get('x-signature-timestamp') ?? '';
+  const sig = req.headers.get('x-signature-ed25519') ?? '';
 
-  // Read raw body before any parsing
-  const raw = await req.text();
-  if (!signature || !timestamp || !publicKey) return badSig();
-  const ok = verifyKey(raw, signature, timestamp, publicKey);
-  if (!ok) return badSig();
-
-  const body = JSON.parse(raw);
-
-  // PING -> PONG
-  if (body.type === InteractionType.PING) {
-    return Response.json({ type: InteractionResponseType.PONG });
+  if (!PK) {
+    log('error', 'Missing DISCORD_PUBLIC_KEY', { reqId, vercelId });
+    return new Response('Server misconfigured', { status: 500, headers: { 'x-request-id': reqId } });
   }
 
-  // Commands
-  if (body.type === InteractionType.APPLICATION_COMMAND) {
-    const name = body?.data?.name;
+  const raw = await req.text();
+
+  let valid = false;
+  try {
+    valid = await verifyKey(raw, sig, ts, PK);
+  } catch (e) {
+    log('error', 'verifyKey threw', { reqId, vercelId, err: (e as Error)?.message ?? String(e) });
+  }
+
+  if (!valid) {
+    log('warn', 'Signature verification failed', {
+      reqId,
+      vercelId,
+      hasSig: Boolean(sig),
+      hasTs: Boolean(ts),
+      bodyLen: raw.length,
+      debug: DEBUG,
+    });
+    return new Response('Bad request', { status: 401, headers: { 'x-request-id': reqId } });
+  }
+
+  const interaction = JSON.parse(raw);
+
+  if (interaction.type === InteractionType.PING) {
+    log('log', 'PING', { reqId });
+    return Response.json({ type: InteractionResponseType.PONG }, { headers: { 'x-request-id': reqId } });
+  }
+
+  if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+    const name = interaction.data?.name;
     if (name === 'ping') {
-      return Response.json({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: '🏓 Pong!', flags: EPHEMERAL },
-      });
+      return Response.json(
+        { type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data: { flags: 64, content: '🏓 Pong!' } },
+        { headers: { 'x-request-id': reqId } }
+      );
     }
 
-    // Default: defer and handle via follow-up later (no heavy work here)
-    return Response.json({ type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE });
+    return Response.json(
+      { type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, data: { flags: 64 } },
+      { headers: { 'x-request-id': reqId } }
+    );
   }
 
-  return new Response('Unhandled interaction type', { status: 400 });
+  log('warn', 'Unhandled interaction type', { reqId, type: interaction.type });
+  return new Response('Unhandled', { status: 400, headers: { 'x-request-id': reqId } });
 }
+
+export async function GET() {
+  return new Response('ok', { status: 200 });
+}
+
