@@ -2,12 +2,9 @@
 /* eslint-disable no-console */
 import nacl from 'tweetnacl';
 import { NextRequest } from 'next/server';
-import Redis from 'ioredis';
 
-// Use Node runtime so ioredis works
+// Use Node runtime
 export const runtime = 'nodejs';
-
-const redis = new Redis(process.env.UPSTASH_REDIS_REST_URL!);
 
 // Discord constants
 const InteractionType = {
@@ -71,29 +68,44 @@ export async function POST(req: NextRequest) {
         data: { content: '🏓 Pong!', flags: EPHEMERAL },
       });
     }
-
-    // For everything else, ack quickly and process async
-    // Queue a job for a worker to handle (publish context you need)
-    const job = {
-      id: interaction.id,
-      token: interaction.token, // used for follow-up
-      application_id: interaction.application_id, // same as client/app id
-      command: name,
-      userId: interaction.member?.user?.id ?? interaction.user?.id,
-      guildId: interaction.guild_id,
-      options: interaction.data?.options ?? [],
-      // add any extra context you'll need later…
-    };
-
-    // Idempotency guard (avoids duplicate processing if Discord retries)
-    await redis.set(`kuyari:interaction:${interaction.id}`, '1', 'EX', 60, 'NX');
-    await redis.lpush('kuyari:jobs', JSON.stringify(job));
-
-    // Deferred ephemeral ACK
-    return Response.json({
+    // For everything else, ACK immediately then enqueue asynchronously via Upstash REST
+    const ack = Response.json({
       type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
       data: { flags: EPHEMERAL },
     });
+
+    // Fire-and-forget enqueue (do not block the ACK)
+    const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (upstashUrl && upstashToken) {
+      const job = {
+        id: interaction.id,
+        token: interaction.token,
+        application_id: interaction.application_id,
+        command: name,
+        userId: interaction.member?.user?.id ?? interaction.user?.id,
+        guildId: interaction.guild_id,
+        options: interaction.data?.options ?? [],
+      };
+      const idKey = `kuyari:interaction:${interaction.id}`;
+      const pipelineBody = {
+        commands: [
+          ['SET', idKey, '1', 'EX', '60', 'NX'],
+          ['LPUSH', 'kuyari:jobs', JSON.stringify(job)],
+        ],
+      } as const;
+      // No await – do not delay the response
+      fetch(`${upstashUrl}/pipeline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${upstashToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pipelineBody),
+      }).catch(() => {});
+    }
+
+    return ack;
   }
 
   // 3) Components / modals (optional paths)
