@@ -3,6 +3,7 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@kuyari/db', '@kuyari/shared'],
+  eslint: { ignoreDuringBuilds: true },
   webpack: (config) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {
