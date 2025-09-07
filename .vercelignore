@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+pnpm-lock.yaml
+
+# build outputs
+.next
+dist
+out
+build
+
+# scripts & local files not needed on Vercel
+scripts
+sql
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
