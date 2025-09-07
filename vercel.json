@@ -2,7 +2,7 @@
   "buildCommand": "cd apps/web && pnpm build",
   "devCommand": "cd apps/web && pnpm dev",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "framework": "other",
+  "framework": "nextjs",
   "env": {
     "NODE_ENV": "production"
   },
