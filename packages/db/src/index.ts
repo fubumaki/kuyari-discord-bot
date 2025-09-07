@@ -74,21 +74,21 @@ export const db = {
   },
 
   guildEntitlements: {
-    async findUnique(args: { where: { guild_id: string } }) {
+    async findUnique(args: { where: { guildId: string } }) {
       const rows = await query(
         "SELECT guild_id, plan, caps, updated_at FROM guild_entitlements WHERE guild_id = $1",
-        [args.where.guild_id]
+        [args.where.guildId]
       );
       return rows[0] ?? null;
     },
 
     // Upsert by guild_id. If no row, creates one; otherwise updates.
     async upsert(args: {
-      where: { guild_id: string };
+      where: { guildId: string };
       create: { plan: Plan; caps?: unknown };
       update: { plan?: Plan; caps?: unknown };
     }) {
-      const { guild_id } = args.where;
+      const guild_id = args.where.guildId;
       const plan = (args.create?.plan ?? args.update?.plan ?? "basic") as Plan;
       const caps = (args.create?.caps ?? args.update?.caps ?? {}) as unknown;
 
@@ -108,11 +108,11 @@ export const db = {
     },
 
     async update(args: {
-      where: { guild_id: string };
+      where: { guildId: string };
       data: { plan?: Plan; caps?: unknown };
     }) {
       const sets: string[] = [];
-      const params: any[] = [args.where.guild_id];
+      const params: any[] = [args.where.guildId];
 
       if (args.data.plan) {
         sets.push(`plan = $${params.length + 1}`);

@@ -7,7 +7,7 @@ import Redis from 'ioredis';
 // Use Node runtime so ioredis works
 export const runtime = 'nodejs';
 
-const redis = new Redis(process.env.REDIS_URL!);
+const redis = new Redis(process.env.UPSTASH_REDIS_REST_URL!);
 
 // Discord constants
 const InteractionType = {
