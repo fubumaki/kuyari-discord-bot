@@ -12,7 +12,9 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "vercel-build": "cd apps/web && pnpm build"
+    "vercel-build": "cd apps/web && pnpm build",
+    "register-commands": "tsx scripts/register-commands.ts",
+    "worker": "tsx scripts/worker.ts"
   },
   "devDependencies": {
     "eslint": "^9.0.0",
