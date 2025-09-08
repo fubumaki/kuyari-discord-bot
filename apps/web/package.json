@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "pnpm -C ../../packages/db install --no-frozen-lockfile --prod=false && pnpm -C ../../packages/db run build && pnpm -C ../../packages/shared install --no-frozen-lockfile --prod=false && pnpm -C ../../packages/shared run build",
+    "prebuild": "pnpm -w --filter @kuyari/db --filter @kuyari/shared run build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
