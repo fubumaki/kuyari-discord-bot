@@ -137,6 +137,47 @@ export const db = {
     },
   },
 
+  guildLLMConfigs: {
+    async findUnique(args: { where: { guildId: string } }) {
+      const rows = await query(
+        `SELECT guild_id, provider, model, enc_key_cipher, updated_at, created_at
+           FROM guild_llm_configs WHERE guild_id = $1`,
+        [args.where.guildId]
+      );
+      return rows[0] ?? null;
+    },
+    async upsert(args: { where: { guildId: string }; create: { provider: string; model: string; encKeyCipher?: string | null } }) {
+      const { guildId } = args.where;
+      const { provider, model, encKeyCipher } = args.create;
+      const rows = await query(
+        `INSERT INTO guild_llm_configs (guild_id, provider, model, enc_key_cipher)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (guild_id) DO UPDATE
+           SET provider = EXCLUDED.provider,
+               model = EXCLUDED.model,
+               enc_key_cipher = EXCLUDED.enc_key_cipher,
+               updated_at = NOW()
+         RETURNING guild_id, provider, model, enc_key_cipher, updated_at, created_at`,
+        [guildId, provider, model, encKeyCipher ?? null]
+      );
+      return rows[0] ?? null;
+    },
+    async update(args: { where: { guildId: string }; data: { provider?: string; model?: string; encKeyCipher?: string | null } }) {
+      const sets: string[] = [];
+      const params: any[] = [args.where.guildId];
+      if (typeof args.data.provider !== 'undefined') { params.push(args.data.provider); sets.push(`provider = $${params.length}`); }
+      if (typeof args.data.model !== 'undefined')     { params.push(args.data.model);     sets.push(`model = $${params.length}`); }
+      if (typeof args.data.encKeyCipher !== 'undefined') { params.push(args.data.encKeyCipher); sets.push(`enc_key_cipher = $${params.length}`); }
+      sets.push('updated_at = NOW()');
+      const rows = await query(
+        `UPDATE guild_llm_configs SET ${sets.join(', ')} WHERE guild_id = $1
+         RETURNING guild_id, provider, model, enc_key_cipher, updated_at, created_at`,
+        params
+      );
+      return rows[0] ?? null;
+    },
+  },
+
   subscriptions: {
     async upsert(args: {
       where: { stripeSubscriptionId: string };
@@ -203,6 +244,31 @@ export const db = {
     async delete(args: { where: { guildId: string; provider: string } }) {
       const { guildId, provider } = args.where;
       await query(`DELETE FROM guild_api_keys WHERE guild_id = $1 AND provider = $2`, [guildId, provider]);
+    },
+  },
+
+  userPrefs: {
+    async get(args: { where: { userId: string; guildId: string } }) {
+      const rows = await query(
+        `SELECT user_id, guild_id, moderation_level, updated_at
+           FROM user_prefs WHERE user_id = $1 AND guild_id = $2`,
+        [args.where.userId, args.where.guildId]
+      );
+      return rows[0] ?? null;
+    },
+    async upsert(args: { where: { userId: string; guildId: string }; create: { moderationLevel: number } }) {
+      const { userId, guildId } = args.where;
+      const { moderationLevel } = args.create;
+      const rows = await query(
+        `INSERT INTO user_prefs (user_id, guild_id, moderation_level)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, guild_id) DO UPDATE
+           SET moderation_level = EXCLUDED.moderation_level,
+               updated_at = NOW()
+         RETURNING user_id, guild_id, moderation_level, updated_at`,
+        [userId, guildId, moderationLevel]
+      );
+      return rows[0] ?? null;
     },
   },
 };
