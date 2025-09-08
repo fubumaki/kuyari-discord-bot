@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ChatInputCommandInteraction, Events, Partials } from 'discord.js';
 import { llmReply } from './llm';
+import { loadGuildApiKey } from '@kuyari/shared/apiKeys';
+import { getEntitlement } from '@kuyari/shared';
 import { getEntitlement, initEntitlementSubscription } from '@kuyari/shared';
 
 // Initialize Redis pub/sub subscription for entitlement changes
@@ -57,7 +59,20 @@ client.on(Events.MessageCreate, async (message) => {
 			'You are Kuyari, a helpful, concise Discord assistant.',
 			'Be brief. No sensitive data. Suggest slash commands when appropriate.',
 		].join(' ');
-		const answer = await llmReply(systemPrompt, cleaned || 'Say hello and suggest /help.');
+		// Plan-aware routing and optional user key on basic
+		const ent = await getEntitlement(message.guild.id);
+		let providerKey: string | undefined;
+		if (ent.plan === 'basic') {
+			providerKey = await loadGuildApiKey(message.guild.id, 'openai') || undefined;
+			if (!providerKey) {
+				await thinking.edit('No API key configured. Please add your OpenAI key in the dashboard.');
+				return;
+			}
+		}
+		const answer = await llmReply(systemPrompt, cleaned || 'Say hello and suggest /help.', {
+			plan: (ent.plan as any) || 'basic',
+			providerKey,
+		});
 		await thinking.edit(answer.slice(0, 1900));
 	} catch (err) {
 		console.error('mention handler error:', err);

@@ -170,6 +170,41 @@ export const db = {
       return rows[0] ?? null;
     },
   },
+
+  guildApiKeys: {
+    async upsert(args: { where: { guildId: string; provider: string }; create: { keyCipher: string } }) {
+      const { guildId, provider } = args.where;
+      const { keyCipher } = args.create;
+      const rows = await query(
+        `
+        INSERT INTO guild_api_keys (guild_id, provider, key_cipher)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (guild_id, provider) DO UPDATE
+          SET key_cipher = EXCLUDED.key_cipher,
+              created_at = NOW()
+        RETURNING id, guild_id, provider, key_cipher, created_at
+        `,
+        [guildId, provider, keyCipher]
+      );
+      return rows[0] ?? null;
+    },
+    async findLatest(args: { where: { guildId: string; provider: string } }) {
+      const { guildId, provider } = args.where;
+      const rows = await query(
+        `SELECT id, guild_id, provider, key_cipher, created_at
+           FROM guild_api_keys
+          WHERE guild_id = $1 AND provider = $2
+          ORDER BY id DESC
+          LIMIT 1`,
+        [guildId, provider]
+      );
+      return rows[0] ?? null;
+    },
+    async delete(args: { where: { guildId: string; provider: string } }) {
+      const { guildId, provider } = args.where;
+      await query(`DELETE FROM guild_api_keys WHERE guild_id = $1 AND provider = $2`, [guildId, provider]);
+    },
+  },
 };
 
 export type DB = typeof db;
