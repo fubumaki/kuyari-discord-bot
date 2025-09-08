@@ -1,7 +1,7 @@
 {
   "buildCommand": "pnpm run vercel-build",
   "devCommand": "pnpm dev",
-  "installCommand": "pnpm -w -r install --no-frozen-lockfile --prod=false",
+  "installCommand": "pnpm -w install --no-frozen-lockfile --prod=false && pnpm -C packages/db install --no-frozen-lockfile --prod=false && pnpm -C packages/shared install --no-frozen-lockfile --prod=false",
   "framework": "nextjs",
   "env": {
     "NODE_ENV": "production"
