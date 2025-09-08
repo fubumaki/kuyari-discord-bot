@@ -138,8 +138,37 @@ export const db = {
   },
 
   subscriptions: {
-    async upsert(_: any) { /* TODO: add if you create subscriptions table */ },
-    async findUnique(_: any) { return null as any; },
+    async upsert(args: {
+      where: { stripeSubscriptionId: string };
+      create: { guildId: string; stripeSubscriptionId: string; status?: string; plan?: string; validFrom?: Date | null; validTo?: Date | null };
+      update: { status?: string; plan?: string; validFrom?: Date | null; validTo?: Date | null };
+    }) {
+      const sId = args.where.stripeSubscriptionId;
+      const data = { ...args.create, ...args.update };
+      const rows = await query(
+        `
+        INSERT INTO subscriptions (guild_id, stripe_subscription_id, status, plan, valid_from, valid_to)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (stripe_subscription_id) DO UPDATE
+          SET status = EXCLUDED.status,
+              plan = EXCLUDED.plan,
+              valid_from = EXCLUDED.valid_from,
+              valid_to = EXCLUDED.valid_to
+        RETURNING id, guild_id, stripe_subscription_id, status, plan, valid_from, valid_to
+        `,
+        [data.guildId, sId, data.status ?? null, data.plan ?? null, data.validFrom ?? null, data.validTo ?? null]
+      );
+      return rows[0] ?? null;
+    },
+    async findUnique(args: { where: { stripeSubscriptionId: string } }) {
+      const rows = await query(
+        `SELECT id, guild_id, stripe_subscription_id, status, plan, valid_from, valid_to
+           FROM subscriptions
+          WHERE stripe_subscription_id = $1`,
+        [args.where.stripeSubscriptionId]
+      );
+      return rows[0] ?? null;
+    },
   },
 };
 
