@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { db } from '@kuyari/db';
-import { publish } from '@kuyari/shared/pubsub';
+import { publish } from '@kuyari/shared';
 
 /**
  * Initialize Stripe using the secret API key from your environment. Use the latest API version.
