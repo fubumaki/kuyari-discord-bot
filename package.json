@@ -14,6 +14,7 @@
     "test": "turbo run test",
     "vercel-build": "cd apps/web && pnpm build",
     "register-commands": "tsx scripts/register-commands.ts",
+    "sync:commands": "tsx scripts/sync-commands.ts",
     "worker": "tsx scripts/worker.ts"
   },
   "dependencies": {
