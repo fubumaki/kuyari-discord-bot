@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { InteractionResponseType, InteractionType, verifyKey } from 'discord-interactions';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const preferredRegion = ['iad1'];
 
@@ -60,6 +60,16 @@ export async function POST(req: NextRequest) {
         { headers: { 'x-request-id': reqId } }
       );
     }
+    if (name === 'plan') {
+      const content = [
+        "Here's a quick plan stub. (A full version will arrive when async follow-ups are implemented.)",
+        '1) Define your goal → 2) Break it into tasks → 3) Assign owners → 4) Set deadlines.',
+      ].join('\n');
+      return Response.json(
+        { type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data: { flags: 64, content } },
+        { headers: { 'x-request-id': reqId } }
+      );
+    }
 
     return Response.json(
       { type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, data: { flags: 64 } },
@@ -73,5 +83,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   return new Response('ok', { status: 200 });
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204 });
 }
 
