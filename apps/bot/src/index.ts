@@ -1,12 +1,21 @@
 import 'dotenv/config';
-import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ChatInputCommandInteraction, Events, Partials } from 'discord.js';
+import { llmReply } from './llm';
 import { getEntitlement, initEntitlementSubscription } from '@kuyari/shared';
 
 // Initialize Redis pub/sub subscription for entitlement changes
 initEntitlementSubscription();
 
-// Create a new Discord client with minimal intents (Guilds and Voice States)
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+// Create a new Discord client with message content to support mention replies
+const client = new Client({
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildVoiceStates,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+	],
+	partials: [Partials.Channel],
+});
 
 // Define slash commands to register (only /plan for now)
 const commands = [
@@ -31,6 +40,28 @@ client.on('interactionCreate', async (i) => {
       `Plan: **${ent.plan}**  |  DJ slots: ${ent.caps.dj_concurrency}`
     );
   }
+});
+
+// Mention-to-LLM reply
+client.on(Events.MessageCreate, async (message) => {
+	try {
+		if (message.author.bot || message.webhookId) return;
+		if (!message.guild) return;
+		if (!message.mentions.has(client.user)) return;
+
+		const raw = message.content ?? '';
+		const cleaned = raw.replace(new RegExp(`<@!?${client.user?.id}>`, 'g'), '').trim();
+
+		const thinking = await message.reply('…');
+		const systemPrompt = [
+			'You are Kuyari, a helpful, concise Discord assistant.',
+			'Be brief. No sensitive data. Suggest slash commands when appropriate.',
+		].join(' ');
+		const answer = await llmReply(systemPrompt, cleaned || 'Say hello and suggest /help.');
+		await thinking.edit(answer.slice(0, 1900));
+	} catch (err) {
+		console.error('mention handler error:', err);
+	}
 });
 
 registerCommands().then(() => client.login(process.env.DISCORD_BOT_TOKEN));
