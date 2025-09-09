@@ -3,7 +3,7 @@ import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ChatInput
 import { getEntitlement, initEntitlementSubscription, applySafetyStream, generateStream, anonymizeId, logMetric, getGuildLLMConfig, loadDecryptedKey } from '@kuyari/shared';
 import { withTyping } from './typing';
 import { chunkForDiscord } from './chunk';
-import { sendQueued } from './queue';
+import { sendQueued, editQueued, replyWithPacing } from './queue';
 
 // Initialize Redis pub/sub subscription for entitlement changes
 initEntitlementSubscription();
@@ -19,10 +19,23 @@ const client = new Client({
 	partials: [Partials.Channel],
 });
 
-// Define slash commands to register (only /plan for now)
+// Define grouped slash commands: /bot <subcommand>
 const commands = [
-  new SlashCommandBuilder().setName('ping').setDescription('Replies with Pong!').toJSON(),
-  new SlashCommandBuilder().setName('plan').setDescription('Show the guild plan').toJSON(),
+  new SlashCommandBuilder()
+    .setName('bot')
+    .setDescription('Bot commands')
+    .addSubcommand((sc) => sc.setName('ping').setDescription('Test the bot connection'))
+    .addSubcommand((sc) => sc.setName('status').setDescription('Show the server plan and status'))
+    .addSubcommand((sc) =>
+      sc
+        .setName('play')
+        .setDescription('Play audio in your voice channel')
+        .addStringOption((o) => o.setName('query').setDescription('Song name or URL').setRequired(true))
+    )
+    .addSubcommand((sc) => sc.setName('stop').setDescription('Stop playback'))
+    .addSubcommand((sc) => sc.setName('skip').setDescription('Skip current track'))
+    .addSubcommand((sc) => sc.setName('queue').setDescription('Show the queue'))
+    .toJSON(),
 ];
 
 async function registerCommands() {
@@ -34,18 +47,39 @@ client.on('ready', () => console.log(`Logged in as ${client.user?.tag}`));
 client.on('interactionCreate', async (i) => {
   if (!i.isChatInputCommand()) return;
   try {
-    if (i.commandName === 'ping') {
-      await i.reply({ content: 'Pong!', ephemeral: true });
-      return;
-    }
-    if (i.commandName === 'plan') {
-      await i.deferReply({ ephemeral: true });
-      if (!i.guildId) {
-        await i.editReply('This command must be used in a guild.');
+    if (i.commandName === 'bot') {
+      const sub = i.options.getSubcommand();
+      if (sub === 'ping') {
+        await i.reply({ content: 'Pong!', ephemeral: true });
         return;
       }
-      const ent = await getEntitlement(i.guildId);
-      await i.editReply(`Plan: **${ent.plan}**  |  DJ slots: ${ent.caps.dj_concurrency}`);
+      if (sub === 'status') {
+        await i.deferReply({ ephemeral: true });
+        if (!i.guildId) {
+          await i.editReply('This command must be used in a guild.');
+          return;
+        }
+        const ent = await getEntitlement(i.guildId);
+        await i.editReply(`Plan: **${ent.plan}**  |  DJ slots: ${ent.caps.dj_concurrency}`);
+        return;
+      }
+      if (sub === 'play') {
+        const query = i.options.getString('query', true);
+        await i.reply({ content: `🎵 (stub) Playing: ${query}`, ephemeral: true });
+        return;
+      }
+      if (sub === 'stop') {
+        await i.reply({ content: '⏹️ (stub) Music stopped.', ephemeral: true });
+        return;
+      }
+      if (sub === 'skip') {
+        await i.reply({ content: '⏭️ (stub) Skipped to next song.', ephemeral: true });
+        return;
+      }
+      if (sub === 'queue') {
+        await i.reply({ content: '📋 (stub) Current queue is empty.', ephemeral: true });
+        return;
+      }
     }
   } catch (err) {
     try { await i.reply({ content: 'Interaction failed.', ephemeral: true }); } catch {}
@@ -90,19 +124,42 @@ client.on(Events.MessageCreate, async (message) => {
       const stream = generateStream({ provider, model, apiKey: key, prompt: cleaned, maxSentences: 2, temperature: 0.3 });
       const safeStream = applySafetyStream(stream, userLevel);
 
-      // Aggregate full text then chunk to respect 2k limit
-      let full = '';
+      // Post a placeholder quickly, then edit in place as tokens arrive
+      const placeholder = await replyWithPacing(message, { content: '…', allowedMentions: { repliedUser: false } });
+
+      const MAX_EDIT = 1900; // keep headroom under Discord limit
+      let buffer = '';
+      let lastPushed = '';
+      let lastEdit = 0;
+      const editIntervalMs = 180;
+
       for await (const chunk of safeStream) {
-        full += chunk;
+        buffer += chunk;
+        const now = Date.now();
+        if (now - lastEdit >= editIntervalMs || /[\.\!\?]\s$/.test(buffer)) {
+          const next = buffer.length > MAX_EDIT ? buffer.slice(0, MAX_EDIT - 1) + '…' : buffer;
+          if (next !== lastPushed) {
+            editQueued(placeholder, { content: next });
+            lastPushed = next;
+            lastEdit = now;
+          }
+        }
       }
 
-      let sentAny = false;
-      for (const chunk of chunkForDiscord(full)) {
-        sendQueued(message.channel, { content: chunk, allowedMentions: { repliedUser: false } });
-        sentAny = true;
-      }
-      if (!sentAny) {
-        await message.reply('…');
+      // Finalize: if over limit, chunk and send remaining parts
+      if (!buffer.trim()) {
+        editQueued(placeholder, { content: '…' });
+      } else {
+        const chunks = Array.from(chunkForDiscord(buffer));
+        if (chunks.length === 0) {
+          editQueued(placeholder, { content: '…' });
+        } else {
+          // Edit first chunk into the placeholder, then queue the rest
+          editQueued(placeholder, { content: chunks[0] });
+          for (let i = 1; i < chunks.length; i++) {
+            sendQueued(message.channel, { content: chunks[i], allowedMentions: { repliedUser: false } });
+          }
+        }
       }
 
       // Metrics (no raw content)

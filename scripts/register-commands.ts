@@ -4,10 +4,26 @@ import 'dotenv/config';
 const APP_ID = process.env.DISCORD_CLIENT_ID!;
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN!;
 
-// Example: /plan
+// Grouped /bot command structure + /llm management
 const commands = [
-  { name: 'ping', description: 'Test the bot connection', dm_permission: false },
-  { name: 'plan', description: 'Show the guild plan', dm_permission: false },
+  {
+    name: 'bot',
+    description: 'Bot commands',
+    dm_permission: false,
+    options: [
+      { type: 1, name: 'ping', description: 'Test the bot connection' },
+      { type: 1, name: 'status', description: 'Show the server plan and status' },
+      {
+        type: 1,
+        name: 'play',
+        description: 'Play audio in your voice channel',
+        options: [{ type: 3, name: 'query', description: 'Song name or URL', required: true }],
+      },
+      { type: 1, name: 'stop', description: 'Stop playback' },
+      { type: 1, name: 'skip', description: 'Skip current track' },
+      { type: 1, name: 'queue', description: 'Show the queue' },
+    ],
+  },
   {
     name: 'llm',
     description: 'Manage AI settings',
@@ -38,9 +54,7 @@ const commands = [
         type: 1,
         name: 'model',
         description: 'Get or set active model',
-        options: [
-          { type: 3, name: 'name', description: 'Model identifier', required: false },
-        ],
+        options: [{ type: 3, name: 'name', description: 'Model identifier', required: false }],
       },
       { type: 1, name: 'test', description: 'Run a minimal LLM test' },
     ],
